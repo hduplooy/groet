@@ -5,9 +5,9 @@ The idea with was to have a simple Router not as big as gorilla/mux for example.
 With *groet* you create a new router then add entries to it to match various aspects of a http request, based on that a corresponding handler is called or a subrouter that can then handle more aspects of the request.
 
 Here is an example:
-`
+<cod>
 package main
-
+`
 import (
 	"fmt"
 	"net/http"
@@ -47,4 +47,5 @@ func main() {
 	rt.Path("testb").HandleFunc(Hello2)
 	http.ListenAndServe(":8080", rt)
 }
+</code>
 `

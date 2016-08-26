@@ -1,4 +1,6 @@
-# groet - The straight forward HTTP Router
+# hduplooy/groet 
+
+## Straight forward HTTP Router
 
 The idea with was to have a simple Router not as big as gorilla/mux for example. So if anyone wants to do some serious regular expression matching etc. against anything in the path etc. rather use something like gorilla/mux.
 

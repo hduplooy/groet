@@ -66,7 +66,7 @@ func (rt *Router) Domain(dom string) *RouterEntry {
 	}
 	dom = strings.ToLower(dom)
 	tmp := &RouterEntry{match: dom}
-	rt.paths[dom] = tmp
+	rt.domains[dom] = tmp
 	return tmp
 }
 
@@ -77,7 +77,7 @@ func (rt *Router) Host(host string) *RouterEntry {
 	}
 	host = strings.ToLower(host)
 	tmp := &RouterEntry{match: host}
-	rt.paths[host] = tmp
+	rt.hosts[host] = tmp
 	return tmp
 }
 

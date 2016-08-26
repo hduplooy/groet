@@ -48,4 +48,16 @@ Here is an example:
 	    http.ListenAndServe(":8080", rt)
     }
 
-`
+`The following image shows how these routes fit together:
+![](http://www.duplooy.org/groet.svg)
+
+Thus the following will be handled:
+<table>
+<tr><td><bold>URL</bold></td><td><bold>Handling</bold></td></tr>
+<tr><td>/testa/alpha/somemore</td><td>MyString("Alpha")</td></tr>
+<tr><td>/test/alpha</td><td>MyString("Alpha")</td></tr>
+<tr><td>/test/beta/rest</td><td>MyString("Beta")</td></tr>
+<tr><td>/test/testerstuff/andmore</td><td>Hello4</td></tr>
+<tr><td>/testb/otherstuff</td><td>Hello2</td></tr>
+</table>
+Any localhost requests will be matched by the anonymous function and passed on to Hello4 to handle and any posts are handled by MyString("Poster"). Both these will depend on the first /testa match for the root router.

@@ -5,47 +5,47 @@ The idea with was to have a simple Router not as big as gorilla/mux for example.
 With *groet* you create a new router then add entries to it to match various aspects of a http request, based on that a corresponding handler is called or a subrouter that can then handle more aspects of the request.
 
 Here is an example:
-<code>
-package main
-`
-import (
-	"fmt"
-	"net/http"
-	"strings"
 
-	"github.com/hduplooy/groet"
-)
+    package main
 
-type MyString string
+    import (
+	    "fmt"
+	    "net/http"
+	    "strings"
 
-func (str MyString) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "<html><body><h1>Hello %s</h1></body></html>", str)
-}
+	    "github.com/hduplooy/groet"
+    )
 
-func Hello2(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "<html><body><h1>Hello B</h1></body></html>")
-}
+    type MyString string
 
-func Hello4(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "<html><body><h1>Hello C</h1><h2>%s</h2></body></html>", r.URL.Path)
-}
+    func (str MyString) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	    fmt.Fprintf(w, "<html><body><h1>Hello %s</h1></body></html>", str)
+    }
 
-func main() {
-	rt := groet.NewRouter()
-	rt2 := groet.NewRouter()
-	rt.Path("testa").Subrouter(rt2)
-	rt2.Path("alpha").Handle(MyString("Alpha"))
-	rt2.Path("beta").Handle(MyString("Beta"))
-	rt2.Match("tester*").HandleFunc(Hello4)
-	rt2.Func(func(r *http.Request, pth string) bool {
-		add := r.RemoteAddr
-		add = add[:strings.LastIndex(add, ":")]
-		fmt.Println(add)
-		return add == "127.0.0.1" || add == "[::1]"
-	}).HandleFunc(Hello4)
-	rt2.Method("POST").Handle(MyString("Poster"))
-	rt.Path("testb").HandleFunc(Hello2)
-	http.ListenAndServe(":8080", rt)
-}
-</code>
+    func Hello2(w http.ResponseWriter, r *http.Request) {
+	    fmt.Fprintf(w, "<html><body><h1>Hello B</h1></body></html>")
+    }
+
+    func Hello4(w http.ResponseWriter, r *http.Request) {
+	    fmt.Fprintf(w, "<html><body><h1>Hello C</h1><h2>%s</h2></body></html>", r.URL.Path)
+    }
+
+    func main() {
+	    rt := groet.NewRouter()
+	    rt2 := groet.NewRouter()
+	    rt.Path("testa").Subrouter(rt2)
+	    rt2.Path("alpha").Handle(MyString("Alpha"))
+	    rt2.Path("beta").Handle(MyString("Beta"))
+	    rt2.Match("tester*").HandleFunc(Hello4)
+	    rt2.Func(func(r *http.Request, pth string) bool {
+		    add := r.RemoteAddr
+		    add = add[:strings.LastIndex(add, ":")]
+		    fmt.Println(add)
+		    return add == "127.0.0.1" || add == "[::1]"
+	    }).HandleFunc(Hello4)
+	    rt2.Method("POST").Handle(MyString("Poster"))
+	    rt.Path("testb").HandleFunc(Hello2)
+	    http.ListenAndServe(":8080", rt)
+    }
+
 `

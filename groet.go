@@ -1,4 +1,7 @@
 // groet project groet.go
+// Author: Hannes du Plooy
+// Revision Date: 3 Sep 2016
+// Basic router library for golang
 package groet
 
 import (

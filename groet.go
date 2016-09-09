@@ -1,6 +1,7 @@
 // groet project groet.go
 // Author: Hannes du Plooy
 // Revision Date: 28 Aug 2016
+//                9 Sep 2016
 // Basic router library for golang
 package groet
 
@@ -69,7 +70,7 @@ func (rt *Router) Domain(dom string) *RouterEntry {
 	}
 	dom = strings.ToLower(dom)
 	tmp := &RouterEntry{match: dom}
-	rt.domains[dom] = tmp
+	rt.paths[dom] = tmp
 	return tmp
 }
 
@@ -80,7 +81,7 @@ func (rt *Router) Host(host string) *RouterEntry {
 	}
 	host = strings.ToLower(host)
 	tmp := &RouterEntry{match: host}
-	rt.hosts[host] = tmp
+	rt.paths[host] = tmp
 	return tmp
 }
 
@@ -229,12 +230,17 @@ func (rt *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		// So split based on / and ignore the leading empty string in the returned slice
 		tmp = strings.Split(req.URL.Path, "/")[1:]
 	}
-	pth := tmp[0]     // The current path element is the first one in the path slice
+	pth := ""
+	if len(tmp) > 0 {
+		pth = tmp[0] // The current path element is the first one in the path slice
+	}
 	if len(tmp) > 0 { // If there is still elements left in the path
 		req.Header["PATH"] = tmp[1:]                                 // Save path elements that is still eleft
 		req.Header["FULLPATH"] = append(req.Header["FULLPATH"], pth) // Build the full path that we've mapped so far
+	} else {
+		req.Header["PATH"] = make([]string, 0)
 	}
-	if len(pth) > 0 { // If there is actually still a path element to work with
+	if len(pth) >= 0 { // If there is actually still a path element to work with
 		if len(rt.paths) > 0 { // Check for the path element
 			rte, ok := rt.paths[pth] // Check if the current path element is in rt.paths
 			if ok {

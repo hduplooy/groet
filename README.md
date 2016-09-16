@@ -1,3 +1,5 @@
+**Busy updating at this moment with templates, file serving, Splitting (if then), Selecting (same as switch). Will be up in about 15 minutes**
+
 # hduplooy/groet 
 
 ## Straight forward HTTP Router

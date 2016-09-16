@@ -64,4 +64,36 @@ Thus the following will be handled:
 <tr><td>/test/testerstuff/andmore</td><td>Hello4</td></tr>
 <tr><td>/testb/otherstuff</td><td>Hello2</td></tr>
 </table>
+
 Any localhost requests will be matched by the anonymous function and passed on to Hello4 to handle and any posts are handled by MyString("Poster"). Both these will depend on the first /testa match for the root router.
+
+## Matchers
+These are matchers on a router, if it is matched then its action is used.
+* Path(pth string) - will match the current position in the url path to pth
+* PathExact(pth string) - will match the full path of the url to pth
+* Domain(dom string) - will match the domain part of the url to dom
+* Host(host string) - will match the host part of the url to host
+* Match(match string) - will do a regexp match of the current element in the path to match
+* Func(f func(*http.Request,string) bool) - will execute the function f with the request and current path to determine if this route should be followed
+* Any - is a catch all, if none of the others match then this will definitely match
+* Port(prt string) - match the port part of the url to prt
+* Method(mthd string) - will match the method (post,get,...) to mthd
+* Protocol(prt string) - currently check if http or https
+
+## Actions
+These are the actions that can be handled for a router match.
+* Subrouter(rt2 *Router) - pass processing over to rt2
+* Handle(hnd http.Handler) - similar to the normal http.Handle
+* HandleFunc(hnd func(http.ResponseWriter,*http.Request)) - similar to the normal http.HandleFunc
+* HandleSplit(hnd,thenpart,elsepart) - call hnd with current request and if it returns true do thenpart else elspart
+* HandleSelect(hnd,actions...) - cal hnd and based on the int returned select the action from actions to handle the request
+* ServeFiles(path,defexts) - serve anything further as file that resides in path (defexts are for folders to get the default.html or whatever)
+* ServeTemplate(f,temp) - call f which returns a template name and the data and then serve the appropriate template in temp
+
+## Utility functions
+* GetHostParts(req) - extract the host, domain and port from the request
+* GetHost(req) - returns only the host part of the request
+* GetDomain(req) - returns only the domain part of the request
+* GetPort(req) - return only the port part of the request
+* ParseTemplates(path,ext) - walk through all files at path and parse those with extension ext as templates and then return resulting template.Template
+

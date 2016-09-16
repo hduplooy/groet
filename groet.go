@@ -1,14 +1,30 @@
 // groet project groet.go
 // Author: Hannes du Plooy
-// Revision Date: 28 Aug 2016
-//                9 Sep 2016
+// Revision Date:
 // Basic router library for golang
+//
+// 28 Aug 2016
+//     Initial
+// 9 Sep 2016
+// 15 Sep 2016
+//    Added HandleIf, HandleSelect, ServeFiles, ServeTemplate
+//    Dropped match string in RouterEntry was only used by regexp matching and that is done now by matchFunc
+//    Dropped handlerFunc etc they are handled by http.Handlers now
+// 16 Sep 2016
+//    Added Template serving as action
+//    Added FileServing as action
+//    Added Split (an if .. then .. else type decision to take one or other action)
+//    Added Select (similar to split but a action from a slice of actions is selected)
 package groet
 
 import (
+	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
+	"text/template"
 )
 
 // Router keep all the rules for routes
@@ -28,11 +44,9 @@ type Router struct {
 // RouterEntry is used for keeping the matching entries within a Router struct
 // This will be created by one of the Router functions and then you can connect a handler, handler func or subrouter to it
 type RouterEntry struct {
-	match       string                                   // Any of the matching values for paths, exactpaths, domains, hosts, ports, methods, protocols or matchPaths
-	matchFunc   func(*http.Request, string) bool         // A function to use to determine if this entry must be used for routing
-	handler     http.Handler                             // A handler interface for this entry to use to handle ServeHTTP
-	handlerFunc func(http.ResponseWriter, *http.Request) // A specific func to use to handle the serving of HTTP
-	subRouter   *Router                                  // A sub router to use
+	matchFunc func(*http.Request, string) bool // A function to use to determine if this entry must be used for routing
+	handler   http.Handler                     // A handler interface for this entry to use to handle ServeHTTP
+	subRouter *Router                          // A sub router to use
 }
 
 // NewRouter creates a blank router that can then be populated
@@ -47,7 +61,7 @@ func (rt *Router) Path(pth string) *RouterEntry {
 	if rt == nil {
 		return nil
 	}
-	tmp := &RouterEntry{match: pth}
+	tmp := &RouterEntry{}
 	rt.paths[pth] = tmp
 	return tmp
 }
@@ -58,7 +72,7 @@ func (rt *Router) PathExact(pth string) *RouterEntry {
 	if rt == nil {
 		return nil
 	}
-	tmp := &RouterEntry{match: pth}
+	tmp := &RouterEntry{}
 	rt.exactPaths[pth] = tmp
 	return tmp
 }
@@ -69,7 +83,7 @@ func (rt *Router) Domain(dom string) *RouterEntry {
 		return nil
 	}
 	dom = strings.ToLower(dom)
-	tmp := &RouterEntry{match: dom}
+	tmp := &RouterEntry{}
 	rt.paths[dom] = tmp
 	return tmp
 }
@@ -80,17 +94,20 @@ func (rt *Router) Host(host string) *RouterEntry {
 		return nil
 	}
 	host = strings.ToLower(host)
-	tmp := &RouterEntry{match: host}
+	tmp := &RouterEntry{}
 	rt.paths[host] = tmp
 	return tmp
 }
 
 // Match will only map if the current path element is matching the pattern provided
-func (rt *Router) Match(mtch string) *RouterEntry {
+func (rt *Router) Match(match string) *RouterEntry {
 	if rt == nil {
 		return nil
 	}
-	tmp := &RouterEntry{match: mtch}
+	tmp := &RouterEntry{matchFunc: func(r *http.Request, pth string) bool {
+		mtch, _ := regexp.MatchString(match, pth)
+		return mtch
+	}}
 	rt.matchPaths = append(rt.matchPaths, tmp)
 	return tmp
 }
@@ -120,7 +137,7 @@ func (rt *Router) Port(prt string) *RouterEntry {
 	if rt == nil {
 		return nil
 	}
-	tmp := &RouterEntry{match: prt}
+	tmp := &RouterEntry{}
 	rt.ports[prt] = tmp
 	return tmp
 }
@@ -131,7 +148,7 @@ func (rt *Router) Method(mthd string) *RouterEntry {
 		return nil
 	}
 	mthd = strings.ToUpper(mthd)
-	tmp := &RouterEntry{match: mthd}
+	tmp := &RouterEntry{}
 	rt.methods[mthd] = tmp
 	return tmp
 }
@@ -141,13 +158,13 @@ func (rt *Router) Protocol(prt string) *RouterEntry {
 	if rt == nil {
 		return nil
 	}
-	tmp := &RouterEntry{match: prt}
+	tmp := &RouterEntry{}
 	rt.protocols[prt] = tmp
 	return tmp
 }
 
-// getHostParts take the request and return the host,domain,port
-func getHostParts(req *http.Request) (string, string, string) {
+// GetHostParts take the request and return the host,domain,port
+func GetHostParts(req *http.Request) (string, string, string) {
 	host := req.Host
 	pos := strings.Index(host, ":")
 	domain := ""
@@ -162,6 +179,24 @@ func getHostParts(req *http.Request) (string, string, string) {
 		host = host[:pos]
 	}
 	return host, domain, port
+}
+
+// GetHost - utility function to get the host part of the call from the client
+func GetHost(req *http.Request) string {
+	host, _, _ := GetHostParts(req)
+	return host
+}
+
+// GetDomain - utility function to get the domain part of the call from the client
+func GetDomain(req *http.Request) string {
+	_, dom, _ := GetHostParts(req)
+	return dom
+}
+
+// GetPort - utility function to get the port part of the call from the client
+func GetPort(req *http.Request) string {
+	_, _, port := GetHostParts(req)
+	return port
 }
 
 // Router.ServeHTTP will determine which of the entries match and then use that to process the request
@@ -188,7 +223,7 @@ func (rt *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 	if len(rt.ports) > 0 {
-		_, _, port := getHostParts(req)
+		_, _, port := GetHostParts(req)
 		rte, ok := rt.ports[port]
 		if ok {
 			rte.ServeHTTP(rw, req)
@@ -196,7 +231,7 @@ func (rt *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 	if len(rt.domains) > 0 {
-		_, domain, _ := getHostParts(req)
+		_, domain, _ := GetHostParts(req)
 		rte, ok := rt.domains[domain]
 		if ok {
 			rte.ServeHTTP(rw, req)
@@ -204,7 +239,7 @@ func (rt *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 	if len(rt.hosts) > 0 {
-		host, _, _ := getHostParts(req)
+		host, _, _ := GetHostParts(req)
 		rte, ok := rt.hosts[host]
 		if ok {
 			rte.ServeHTTP(rw, req)
@@ -251,7 +286,7 @@ func (rt *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 		if len(rt.matchPaths) > 0 { // If there are regexp entries
 			for _, rte := range rt.matchPaths { // Go through all the regexp entries
-				if mtch, _ := regexp.MatchString(rte.match, pth); mtch { // If an entry matches then use it
+				if rte.matchFunc(req, pth) {
 					rte.ServeHTTP(rw, req)
 					return
 				}
@@ -283,6 +318,15 @@ func (rte *RouterEntry) Subrouter(rt2 *Router) {
 	rte.subRouter = rt2
 }
 
+// FuncHandler is a struct that is a http.Handler for our own funcs
+type FuncHandler struct {
+	FN func(http.ResponseWriter, *http.Request)
+}
+
+func (fh *FuncHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	fh.FN(w, r)
+}
+
 // Handle assigns a http.Handler interface based value to handle requests
 func (rte *RouterEntry) Handle(hnd http.Handler) {
 	if rte == nil {
@@ -296,18 +340,134 @@ func (rte *RouterEntry) HandleFunc(hnd func(http.ResponseWriter, *http.Request))
 	if rte == nil {
 		return
 	}
-	rte.handlerFunc = hnd
+	rte.handler = &FuncHandler{hnd}
+}
+
+// HandleSplit will execute func hnd if a true is returned the thenpart handler is processed else the elsepart handler
+// This allows us to do basic decisions when routes are declared and then to take either one path or another
+func (rte *RouterEntry) HandleSplit(hnd func(*http.Request) bool, thenpart http.Handler, elsepart http.Handler) {
+	if rte == nil {
+		return
+	}
+	rte.handler = &FuncHandler{func(w http.ResponseWriter, r *http.Request) {
+		if hnd(r) {
+			thenpart.ServeHTTP(w, r)
+		} else {
+			elsepart.ServeHTTP(w, r)
+		}
+	}}
+}
+
+// HandleSelect will execute hnd which returns an int which is used to select the handler in actions which will handle the action further
+// else NotFoundHandler is asked to process the action. So the best is to make sure the hnd function returns a valid int
+func (rte *RouterEntry) HandleSelect(hnd func(*http.Request) int, actions ...http.Handler) {
+	if rte == nil {
+		return
+	}
+	rte.handler = &FuncHandler{func(w http.ResponseWriter, r *http.Request) {
+		pos := hnd(r)
+		if pos < 0 || pos >= len(actions) {
+			http.NotFoundHandler().ServeHTTP(w, r) // If nothing then let NotFoundHandler handle it
+		} else {
+			actions[pos].ServeHTTP(w, r)
+		}
+	}}
+}
+
+// ServeFiles is a basic file server a the specified path.
+func (rte *RouterEntry) ServeFiles(path string, defexts []string) {
+	if rte == nil {
+		return
+	}
+	if !strings.HasSuffix(path, string(os.PathSeparator)) {
+		path += string(os.PathSeparator)
+	}
+	rte.handler = &FuncHandler{func(w http.ResponseWriter, r *http.Request) {
+		fname := path + strings.Join(r.Header["PATH"], string(os.PathSeparator))
+		st, err := os.Stat(fname)
+		if err != nil { // If it is not a file or directory, then not found
+			http.NotFoundHandler().ServeHTTP(w, r)
+		} else {
+			if st.IsDir() { // If it is a directory search for and index file
+				if fname[len(fname)-1] != '/' { // Add a trailing / if none
+					fname += "/"
+				}
+				// If index.html exists within the directory then serve it
+				if st, err = os.Stat(fname + "index.html"); err == nil && !st.IsDir() {
+					http.ServeFile(w, r, fname+"index.html")
+				} else {
+					// For every cgi extension see if that index file exists
+					//   if it does then let pass it on to the cgi handler
+					for _, ext := range defexts {
+						if st, err = os.Stat(fname + "index." + ext); err == nil && !st.IsDir() {
+							http.ServeFile(w, r, fname+"index."+ext)
+							return
+						}
+					}
+					// If nothing matches then do a not found (we don't do directory listings)
+					http.NotFoundHandler().ServeHTTP(w, r)
+				}
+			} else {
+				// If it is a file then serve it
+				http.ServeFile(w, r, fname)
+			}
+		}
+	}}
+}
+
+// ServeTemplate will call the func f which returns the template name to use and the data for it
+// temp is then asked to execute the correct template
+func (rte *RouterEntry) ServeTemplate(f func(*http.Request) (string, interface{}), temp *template.Template) {
+	if rte == nil {
+		return
+	}
+	rte.handler = &FuncHandler{func(w http.ResponseWriter, r *http.Request) {
+		nm, data := f(r)
+		temp.ExecuteTemplate(w, nm, data)
+	}}
+}
+
+// TemplateHandleFunc is a func that can be called anywhere with func f providing the template name and the data
+// temp is then asked to execute the correct template
+func TemplateHandleFunc(f func(*http.Request) (string, interface{}), temp *template.Template) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		nm, data := f(r)
+
+		temp.ExecuteTemplate(w, nm, data)
+	}
 }
 
 // ServeHTTP will handle the actual request for the entry
-func (rte *RouterEntry) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if rte.handlerFunc != nil { // If there is a handler function then use it
-		rte.handlerFunc(rw, req)
-	} else if rte.handler != nil { // If there is a handler interface entry then use it
-		rte.handler.ServeHTTP(rw, req)
+func (rte *RouterEntry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if rte.handler != nil { // If there is a handler interface entry then use it
+		rte.handler.ServeHTTP(w, r)
 	} else if rte.subRouter != nil { // If there is a sub router then tell it to handle the request
-		rte.subRouter.ServeHTTP(rw, req)
+		rte.subRouter.ServeHTTP(w, r)
 	} else {
-		http.NotFoundHandler().ServeHTTP(rw, req) // If nothing then let NotFoundHandler handle it
+		http.NotFoundHandler().ServeHTTP(w, r) // If nothing then let NotFoundHandler handle it
 	}
+}
+
+// ParseTemplates is an utility function to walk from a path and then deeper and to
+// add them all to a template and return that template
+// ext is the extension of the template files to look for
+func ParseTemplates(path string, ext string) *template.Template {
+	temp := &template.Template{}
+	if !strings.HasPrefix(ext, ".") {
+		ext = "." + ext
+	}
+	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if strings.HasSuffix(path, ext) {
+			_, err := temp.ParseFiles(path)
+			if err != nil {
+				log.Printf("Error with parsing of templates: %s\n", err.Error())
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		log.Printf("Error with parsing of templates: %s\n", err.Error())
+		return nil
+	}
+	return temp
 }

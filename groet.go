@@ -15,9 +15,12 @@
 //    Added FileServing as action
 //    Added Split (an if .. then .. else type decision to take one or other action)
 //    Added Select (similar to split but a action from a slice of actions is selected)
+// 19 Sep 2016
+//    Fixed Domain() and Host() to add to domains and hosts individually
 package groet
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -84,7 +87,7 @@ func (rt *Router) Domain(dom string) *RouterEntry {
 	}
 	dom = strings.ToLower(dom)
 	tmp := &RouterEntry{}
-	rt.paths[dom] = tmp
+	rt.domains[dom] = tmp
 	return tmp
 }
 
@@ -95,7 +98,7 @@ func (rt *Router) Host(host string) *RouterEntry {
 	}
 	host = strings.ToLower(host)
 	tmp := &RouterEntry{}
-	rt.paths[host] = tmp
+	rt.hosts[host] = tmp
 	return tmp
 }
 
@@ -233,6 +236,7 @@ func (rt *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if len(rt.domains) > 0 {
 		_, domain, _ := GetHostParts(req)
 		rte, ok := rt.domains[domain]
+		fmt.Printf("dom=%s ok=%t\n ", domain, ok)
 		if ok {
 			rte.ServeHTTP(rw, req)
 			return
